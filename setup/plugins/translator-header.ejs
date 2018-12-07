@@ -4,7 +4,7 @@ var Translator = {
   BetterTeX: <%- ['Better BibTeX', 'Better BibLaTeX'].includes(header.label) %>,
   BetterCSL: <%- ['Better CSL JSON', 'Better CSL YAML'].includes(header.label) %>,
   header: ZOTERO_TRANSLATOR_INFO,
-  // header: < %- JSON.stringify(header) % >,
+  override: <%- JSON.stringify(overrides) %>,
   options: <%- JSON.stringify(header.displayOptions || {}) %>,
 
   stringCompare: (new Intl.Collator('en')).compare,
