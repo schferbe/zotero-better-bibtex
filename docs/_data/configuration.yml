@@ -325,6 +325,9 @@
     parseParticles:
       default: 'True'
       description: Name particle handling
+    postscriptOverride:
+      default: ''
+      description: Set to a filename (only) to enable
     relativeFilePaths:
       default: 'False'
       description: When exporting a Bib(La)TeX file, if the attachments are stored

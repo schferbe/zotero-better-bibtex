@@ -28,7 +28,9 @@ class TranslatorHeaderPlugin {
       const asset = this.translator + '.js'
 
       const header = JSON.parse(JSON.stringify(translators.byName[this.translator]))
-      const overrides = {}
+      const overrides = {
+        postscript: true,
+      }
       for (const pref of Object.keys(prefs.defaults)) {
         overrides[pref] = prefs.overrides.includes(pref)
       }

@@ -5,7 +5,6 @@ var Translator = {
   BetterCSL: <%- ['Better CSL JSON', 'Better CSL YAML'].includes(header.label) %>,
   header: ZOTERO_TRANSLATOR_INFO,
   // header: < %- JSON.stringify(header) % >,
-  override: <%- JSON.stringify(overrides) %>,
   options: <%- JSON.stringify(header.displayOptions || {}) %>,
 
   stringCompare: (new Intl.Collator('en')).compare,
@@ -63,7 +62,18 @@ var Translator = {
     if (!this.preferences.rawLaTag) this.preferences.rawLaTag = '#LaTeX'
     Zotero.debug('prefs loaded: ' + JSON.stringify(this.preferences, null, 2))
 
-    this.caching = !this.options.exportFileData && (!this.BetterTeX || this.preferences.jabrefFormat !== 4)
+    this.caching =
+      // when exporting files, you get relative file paths, when not, absolute. I can only stick one in the cache
+      !this.options.exportFileData
+
+      // JR4 stores the collection info inside the reference itself so it varies per part of the DB exported
+      && (!this.BetterTeX || this.preferences.jabrefFormat !== 4)
+
+      // I can't see when a postscript override has changed, and it would introduce variability into the export
+      && !Zotero.getOption('preference_postscript')
+
+      // a little hacky, but if the postscript has this it's probably outputting different stuff per location
+      && ((this.preferences.postscript || '').indexOf('Translator.options.exportPath') >= 0)
 
     this.collections = {}
     if (stage == 'doExport' && this.header.configOptions && this.header.configOptions.getCollections && Zotero.nextCollection) {

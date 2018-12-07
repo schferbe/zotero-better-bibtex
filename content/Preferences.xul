@@ -434,6 +434,15 @@
         -->
 
         <preference
+          name="extensions.zotero.translators.better-bibtex.postscriptOverride"
+          id="pref-better-bibtex-git"
+          type="string"
+          default=""/>
+        <!--!!
+          Set to a filename (only) to enable
+        -->
+
+        <preference
           name="extensions.zotero.translators.better-bibtex.debugLog"
           type="string"
           default=""/>

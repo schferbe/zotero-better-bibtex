@@ -311,6 +311,15 @@ $patch$(Zotero.Translate.Export.prototype, 'translate', original => function() {
       } else {
         this._displayOptions.exportPath = this.location.parent.path
       }
+
+      const postscriptOverrideFilename = Prefs.get('postscriptOverride')
+      if (postscriptOverrideFilename) {
+        const postscriptOverride = Zotero.File.pathToFile(this._displayOptions.exportPath)
+        postscriptOverride.append(postscriptOverrideFilename)
+        if (postscriptOverride.exists()) {
+          this._displayOptions.preference_postscript = Zotero.File.getContents(postscriptOverride)
+        }
+      }
     }
 
     let capture = this._displayOptions && this._displayOptions.keepUpdated
