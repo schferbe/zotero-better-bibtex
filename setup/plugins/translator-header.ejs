@@ -71,7 +71,7 @@ var Translator = {
         || (this.BetterTeX && this.preferences.jabrefFormat === 4)
 
         // if you're looking at Translator.options.exportPath in the postscript you're probably outputting something different based on it
-        || ((Translator.preferences.postscript || '').indexOf('Translator.options.exportPath') >= 0)
+        || ((this.preferences.postscript || '').indexOf('Translator.options.exportPath') >= 0)
 
         // I can't see when a postscript override has changed, and it would introduce variability into the export
         || Zotero.getOption('preference_postscript')
