@@ -10,6 +10,7 @@ import { htmlEscape } from './lib/html-escape'
 import JSON5 = require('json5')
 import * as biblatex from 'biblatex-csl-converter/src/import/biblatex'
 import { valid as validFields } from '../gen/itemfields'
+import { arXiv } from '../content/arXiv'
 
 Reference.prototype.caseConversion = {
   title: true,
@@ -452,8 +453,8 @@ class ZoteroItem {
   private fields: any // comes from biblatex parser
   private type: string
   private hackyFields: string[]
-  private biblatexdata: { [key: string]: string }
-  private biblatexdatajson: boolean
+  private eprint: { [key: string]: string }
+  private extra: { data: { [key: string]: string }, json: boolean }
   private validFields: Map<string, boolean>
   private numberPrefix: string
 
@@ -468,7 +469,7 @@ class ZoteroItem {
 
     this.item = new Zotero.Item(this.type)
     this.item.itemID = this.id
-    this.biblatexdata = {}
+    this.extra = { data: {}, json: false }
 
     this.import()
 
@@ -830,30 +831,28 @@ class ZoteroItem {
 
   protected $shorttitle(value) { return this.set('shortTitle', this.unparse(value)) }
 
-  protected _$eprinttype(value) {
-    if (!value) return null
-    const eprinttype = this.unparse(value)
+  protected $eprinttype(value, field) {
+    this.eprint[field] = this.unparse(value).trim()
 
-    switch (eprinttype.trim().toLowerCase()) {
-      case 'arxiv':       return 'arXiv'
-      case 'jstor':       return 'JSTOR'
-      case 'pubmed':      return 'PMID'
-      case 'hdl':         return 'HDL'
-      case 'googlebooks': return 'GoogleBooksID'
-      default:            return null
-    }
-  }
-  protected $eprint(value) {
-    /* Support for IDs exported by BibLaTeX */
-    const eprinttype = this._$eprinttype(this.fields.eprinttype ||  this.fields.archiveprefix)
-    if (!eprinttype) return false
+    this.eprint.eprintType = {
+      arxiv:        'arXiv',
+      jstor:        'JSTOR',
+      pubmed:       'PMID',
+      hdl:          'HDL',
+      googlebooks:  'GoogleBooksID',
+    }[this.eprint[field].toLowerCase()] || ''
 
-    const eprint = this.unparse(value)
-    this.hackyFields.push(`${eprinttype}: ${eprint}`)
     return true
   }
-  protected $eprinttype(value) { return this.fields.eprint && this._$eprinttype(value) }
-  protected $archiveprefix(value) { return this.$eprinttype(value) }
+  protected $archiveprefix(value, field) { return this.$eprinttype(value, field) }
+
+  protected $eprint(value, field) {
+    this.eprint[field] = this.unparse(value)
+    return true
+  }
+  protected $eprintclass(value, field) { return this.$eprint(value, field) }
+  protected $primaryclass(value, field) { return this.$eprint(value, 'eprintclass') }
+  protected $slaccitation(value, field) { return this.$eprint(value, field) }
 
   protected $nationality(value) { return this.set('country', this.unparse(value)) }
 
@@ -1004,6 +1003,7 @@ class ZoteroItem {
 
   private import() {
     this.hackyFields = []
+    this.eprint = {}
 
     for (const subtitle of ['titleaddon', 'subtitle']) {
       if (!this.fields.title && this.fields[subtitle]) {
@@ -1041,21 +1041,46 @@ class ZoteroItem {
 
     if (this.bibtex.entry_key) this.addToExtra(`Citation Key: ${this.bibtex.entry_key}`) // Endnote has no citation keys in their bibtex
 
-    const keys = Object.keys(this.biblatexdata)
-    if (keys.length > 0) {
-      let biblatexdata
-      if (Translator.preferences.testing) keys.sort()
-      if (this.biblatexdatajson && Translator.preferences.testing) {
-        biblatexdata = `bibtex{${keys.map(k => JSON5.stringify({[k]: this.biblatexdata[k]}).slice(1, -1))}}`
+    if (this.eprint.slaccitation && !this.eprint.eprint) {
+      const m = this.eprint.slaccitation.match(/^%%CITATION = (.+);%%$/)
+      const arxiv = arXiv.parse(m && m[1].trim())
 
-      } else if (this.biblatexdatajson) {
-        biblatexdata = `bibtex${JSON5.stringify(this.biblatexdata)}`
+      if (arxiv.id) {
+        this.eprint.eprintType = this.eprint.eprinttype = 'arXiv'
+        if (!this.eprint.archiveprefix) this.eprint.archiveprefix = 'arXiv'
+        this.eprint.eprint = arxiv.id
+        if (!this.eprint.eprintclass && arxiv.category) this.eprint.eprintclass = arxiv.category
+      }
+    }
+    delete this.eprint.slaccitation
+
+    if (this.eprint.eprintType && this.eprint.eprint) {
+      const eprintclass = this.eprint.eprintType === 'arXiv' && this.eprint.eprintclass ? ` [${this.eprint.eprintclass}]` : ''
+      this.hackyFields.push(`${this.eprint.eprintType}: ${this.eprint.eprint}${eprintclass}`)
+
+    } else {
+
+      delete this.eprint.eprintType
+      for (const [k, v] of Object.entries(this.eprint)) {
+        this.addToExtraData(k, v)
+      }
+    }
+
+    const keys = Object.keys(this.extra.data)
+    if (keys.length > 0) {
+      let extraData
+      if (Translator.preferences.testing) keys.sort()
+      if (this.extra.json && Translator.preferences.testing) {
+        extraData = `bibtex*{${keys.map(k => JSON5.stringify({[k]: this.extra.data[k]}).slice(1, -1))}}`
+
+      } else if (this.extra.json) {
+        extraData = `bibtex*${JSON5.stringify(this.extra.data)}`
 
       } else {
-        biblatexdata = `bibtex[${keys.map(key => `${key}=${this.biblatexdata[key]}`).join(';')}]`
+        extraData = `bibtex*[${keys.map(key => `${key}=${this.extra.data[key]}`).join(';')}]`
       }
 
-      this.addToExtra(biblatexdata)
+      this.addToExtra(extraData)
     }
 
     if (this.hackyFields.length > 0) {
@@ -1078,8 +1103,8 @@ class ZoteroItem {
   }
 
   private addToExtraData(key, value) {
-    this.biblatexdata[key] = this.unparse(value)
-    if (key.match(/[\[\]=;\r\n]/) || value.match(/[\[\]=;\r\n]/)) this.biblatexdatajson = true
+    this.extra.data[key] = this.unparse(value)
+    if (key.match(/[\[\]=;\r\n]/) || value.match(/[\[\]=;\r\n]/)) this.extra.json = true
   }
 
   private set(field, value) {

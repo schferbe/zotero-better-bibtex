@@ -201,7 +201,7 @@ class PatternFormatter {
   /** returns the name of the shared group library, or nothing if the reference is in your personal library */
   public $library() {
     if (this.item.item.libraryID === Zotero.Libraries.userLibraryID) return ''
-    return Zotero.Libraries.getName(this.item.item.libraryID)
+    return Zotero.Libraries.get(this.item.item.libraryID).name
   }
 
   /** The first `N` (default: all) characters of the `M`th (default: first) author's last name. */
@@ -367,6 +367,12 @@ class PatternFormatter {
     this.item.tags = this.item.tags || this.item.item.getTags().map(tag => tag.tag)
     return this.item.tags[n] || ''
   }
+
+  /* internal alphanumeric zotero item key
+  public $key() {
+    return this.item.item.key
+  }
+  */
 
   /** The first `N` (default: 3) words of the title, first `M` (default: 0) capitalized */
   public $shorttitle(n = 3, m = 0) { // tslint:disable-line:no-magic-numbers

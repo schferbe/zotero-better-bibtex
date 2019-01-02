@@ -1,6 +1,5 @@
 declare const Components: any
 declare const Zotero: any
-declare const AddonManager: any
 
 import { Preferences as Prefs } from './prefs' // needs to be here early, initializes the prefs observer
 require('./pull-export') // just require, initializes the pull-export end points
@@ -8,6 +7,7 @@ require('./json-rpc') // just require, initializes the json-rpc end point
 import { AUXScanner } from './aux-scanner'
 
 Components.utils.import('resource://gre/modules/AddonManager.jsm')
+declare const AddonManager: any
 
 import * as log from './debug'
 import { flash } from './flash'
@@ -376,7 +376,6 @@ function notify(event, handler) {
   Zotero.Notifier.registerObserver({
     notify(...args) {
       BetterBibTeX.ready.then(() => { // tslint:disable-line:no-use-before-declare
-        log.trigger()
         handler.apply(null, args)
       })
     },
@@ -575,10 +574,33 @@ export let BetterBibTeX = new class { // tslint:disable-line:variable-name
     }
   }
 
-  public async scanAUX(path = null) {
-    if (this.loaded) {
-      await this.loaded
-      await AUXScanner.scan(path)
+  public async scanAUX(target) {
+    if (!this.loaded) return
+    await this.loaded
+
+    const aux = AUXScanner.pick()
+    if (!aux) return
+
+    switch (target) {
+      case 'collection':
+        await AUXScanner.scan(aux)
+        break
+
+      case 'tag':
+        const ps = Components.classes['@mozilla.org/embedcomp/prompt-service;1'].getService(Components.interfaces.nsIPromptService)
+
+        let name = aux.leafName
+        name = name.lastIndexOf('.') > 0 ? name.substr(0, name.lastIndexOf('.')) : name
+        const tag = { value: name }
+        if (!ps.prompt(null, this.getString('BetterBibTeX.auxScan.title'), this.getString('BetterBibTeX.auxScan.prompt'), tag, null, {})) return
+        if (!tag.value) return
+
+        await AUXScanner.scan(aux, tag.value)
+        break
+
+      default:
+        flash(`Unsupported aux-scan target ${target}`)
+        break
     }
   }
 
@@ -654,7 +676,6 @@ export let BetterBibTeX = new class { // tslint:disable-line:variable-name
     // should be safe to start tests at this point. I hate async.
 
     deferred.ready.resolve(true)
-    log.trigger()
 
     progress.done()
 

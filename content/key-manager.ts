@@ -8,6 +8,8 @@ import * as log from './debug'
 import { timeout } from './timeout'
 import { flash } from './flash'
 import { Events } from './events'
+import { arXiv } from './arXiv'
+import { extract as varExtract } from './var-extract'
 
 import * as ZoteroDB from './db/zotero'
 
@@ -33,18 +35,40 @@ export let KeyManager = new class { // tslint:disable-line:variable-name
   private itemObserverDelay: number = Prefs.get('itemObserverDelay')
   private scanning: any[]
 
-  public async pin(ids) {
+  public async pin(ids, inspireHEP = false) {
     ids = this.expandSelection(ids)
     log.debug('KeyManager.pin', ids)
+
+    const inspireSearch = 'http://inspirehep.net/search?of=recjson&ot=system_control_number&p='
 
     for (const item of await getItemsAsync(ids)) {
       if (item.isNote() || item.isAttachment()) continue
 
-      const parsed = Citekey.get(item.getField('extra'))
-      if (parsed.pinned) continue
-
       try {
-        const citekey = this.get(item.id).citekey || this.update(item)
+        let parsed
+        let citekey
+
+        if (inspireHEP) {
+          parsed = varExtract({ extra: item.getField('extra') })
+
+          let key = parsed.extraFields.csl.DOI || item.getField('DOI') || arXiv.parse(parsed.extraFields.kv.arxiv).id
+          if (!key && ['arxiv.org', 'arxiv'].includes((item.getField('libraryCatalog') || '').toLowerCase())) key = arXiv.parse(item.getField('publicationTitle')).id
+          if (!key) throw new Error(`No DOI or arXiv ID for ${item.getField('title')}`)
+
+          const results = JSON.parse((await Zotero.HTTP.request('GET', inspireSearch + encodeURIComponent(key))).responseText)
+          if (results.length !== 1) throw new Error(`Expected 1 inspire result for ${item.getField('title')}, got ${results.length}`)
+
+          citekey = results[0].system_control_number.find(i => i.institute.endsWith('TeX') && i.value).value
+
+          if (parsed.extraFields.citekey.citekey === citekey && parsed.extraFields.citekey.pinned) continue
+
+        } else {
+          parsed = Citekey.get(item.getField('extra'))
+          if (parsed.pinned) continue
+
+          citekey = this.get(item.id).citekey || this.update(item)
+        }
+
         item.setField('extra', Citekey.set(parsed.extra, citekey))
         await item.saveTx() // this should cause an update and key registration
       } catch (err) {

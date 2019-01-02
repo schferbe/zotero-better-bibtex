@@ -6,6 +6,8 @@ import { text2latex } from './unicode_translator'
 import { debug } from '../lib/debug'
 import { datefield } from './datefield'
 
+import { arXiv } from '../../content/arXiv'
+
 interface IField {
   name: string
   verbatim?: string
@@ -23,36 +25,6 @@ interface IField {
   html?: boolean
 
   bibtex?: string
-}
-
-const arXiv = new class {
-  // new-style IDs
-  // arXiv:0707.3168 [hep-th]
-  // arXiv:YYMM.NNNNv# [category]
-  private new = /^arxiv:([0-9]{4}\.[0-9]+)(v[0-9]+)?([^\S\n]+\[(.*)\])?$/i
-
-  // arXiv:arch-ive/YYMMNNNv# or arXiv:arch-ive/YYMMNNNv# [category]
-  private old = /^arxiv:([a-z]+-[a-z]+\/[0-9]{7})(v[0-9]+)?([^\S\n]+\[(.*)\])?$/i
-
-  // bare
-  private bare = /^arxiv:[^\S\n]*([\S]+)/i
-
-  public parse(id) {
-    let m
-    if (!id) return undefined
-
-    if (m = this.new.exec(id)) {
-      return { id, eprint: m[1], primaryClass: m[4] } // tslint:disable-line:no-magic-numbers
-    }
-    if (m = this.old.exec(id)) {
-      return { id, eprint: m[1], primaryClass: m[4] } // tslint:disable-line:no-magic-numbers
-    }
-    if (m = this.bare.exec(id)) {
-      return { id, eprint: m[1] }
-    }
-
-    return undefined
-  }
 }
 
 const Language = new class { // tslint:disable-line:variable-name
@@ -373,20 +345,24 @@ export class Reference {
       }
     }
 
-    if (['arxiv.org', 'arxiv'].includes((this.item.libraryCatalog || '').toLowerCase()) && (this.item.arXiv = arXiv.parse(this.item.publicationTitle))) {
+    if ((this.item.libraryCatalog || '').match(/^arxiv(\.org)?$/i) && (this.item.arXiv = arXiv.parse(this.item.publicationTitle)) && this.item.arXiv.id) {
       this.item.arXiv.source = 'publicationTitle'
       if (Translator.BetterBibLaTeX) delete this.item.publicationTitle
 
-    } else if (this.item.extraFields.kv.arxiv && (this.item.arXiv = arXiv.parse(`arxiv:${this.item.extraFields.kv.arxiv}`))) {
+    } else if (this.item.extraFields.kv.arxiv && (this.item.arXiv = arXiv.parse(this.item.extraFields.kv.arxiv)) && this.item.arXiv.id) {
       this.item.arXiv.source = 'extra'
+
+    } else {
+      this.item.arXiv = null
+
     }
 
     if (this.item.arXiv) {
+      delete this.item.extraFields.kv.arxiv
       this.add({ name: 'archivePrefix', value: 'arXiv'} )
       this.add({ name: 'eprinttype', value: 'arxiv'})
-      this.add({ name: 'eprint', value: this.item.arXiv.eprint })
-      if (this.item.arXiv.primaryClass) this.add({ name: 'primaryClass', value: this.item.arXiv.primaryClass })
-      delete this.item.extraFields.kv.arxiv
+      this.add({ name: 'eprint', value: this.item.arXiv.id })
+      this.add({ name: 'primaryClass', value: this.item.arXiv.category })
     }
   }
 
@@ -679,8 +655,8 @@ export class Reference {
 
       // psuedo-var, sets the reference type
       if (name === 'referencetype') {
-        this.referencetype = field.value
-        continue
+          this.referencetype = field.value
+          continue
       }
 
       debug('extraFields: bibtex')
@@ -793,8 +769,9 @@ export class Reference {
    */
   protected enc_url(f) {
     const value = this.enc_verbatim(f)
+
     if (Translator.BetterBibTeX) {
-      return `\\url{${this.enc_verbatim(f)}}`
+      return `\\url{${value}}`
     } else {
       return value
     }
@@ -826,7 +803,8 @@ export class Reference {
     for (const creator of f.value) {
       let name
       if (creator.name || (creator.lastName && (creator.fieldMode === 1))) {
-        name = raw ? `{${creator.name || creator.lastName}}` : this.enc_latex({value: new String(this._enc_creators_scrub_name(creator.name || creator.lastName))}) // tslint:disable-line:no-construct
+        name = creator.name || creator.lastName
+        if (name !== 'others') name = raw ? `{${name}}` : this.enc_latex({value: new String(this._enc_creators_scrub_name(name))}) // tslint:disable-line:no-construct
 
       } else if (raw) {
         name = [creator.lastName || '', creator.firstName || ''].join(', ')
@@ -1138,13 +1116,15 @@ export class Reference {
   private postscript(reference, item) {} // tslint:disable-line:no-empty
 
   private toVerbatim(text) {
+    text = text || ''
+
     let value
     if (Translator.BetterBibTeX) {
-      value = (`${text}`).replace(/([#\\%&{}])/g, '\\$1')
+      value = text.replace(/([#\\%&{}])/g, '\\$1')
     } else {
-      value = (`${text}`).replace(/([\\{}])/g, '\\$1')
+      value = text.replace(/([\\{}])/g, '\\$1')
     }
-    if (!Translator.unicode) value = value.replace(/[^\x21-\x7E]/g, (chr => `\\%${`00${chr.charCodeAt(0).toString(16).slice(-2)}`}`)) // tslint:disable-line:no-magic-numbers
+    if (!Translator.unicode) value = value.replace(/[^\x20-\x7E]/g, (chr => `\\%${`00${chr.charCodeAt(0).toString(16).slice(-2)}`}`)) // tslint:disable-line:no-magic-numbers
     return value
   }
 
