@@ -439,7 +439,12 @@
           type="string"
           default=""/>
         <!--!!
-          Set to a filename (only) to enable
+          Set to a filename to enable. When a file by this name is
+          found in the directory to which the Bib(La)TeX file is exported,
+          it will be read and its contents will be used instead of the
+          postscript in the configuration screen. When an override script
+          is found, exports are not cached for that export so they'll
+          run considerably slower.
         -->
 
         <preference
