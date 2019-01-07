@@ -10,6 +10,7 @@ var Translator = {
   stringCompare: (new Intl.Collator('en')).compare,
 
   configure: function(stage) {
+    Zotero.debug(`{${this.header.label}} configuring ${stage}`)
     var version = Zotero.BetterBibTeX.version();
     this.isZotero = version.Zotero.isZotero;
     this.isJurisM = version.Zotero.isJurisM;
@@ -38,6 +39,7 @@ var Translator = {
       if (stage === 'doExport') {
         this.options.exportPath = Zotero.getOption('exportPath')
         if (this.options.exportPath && !this.options.exportPath.endsWith(this.pathSep)) this.options.exportPath += this.pathSep
+        Zotero.debug(`{${this.header.label}} exporting to ${this.options.exportPath}`)
       }
     }
 
@@ -60,7 +62,13 @@ var Translator = {
     this.preferences.skipWords = this.preferences.skipWords.toLowerCase().trim().split(/\s*,\s*/).filter(function(s) { return s })
     this.preferences.skipFields = this.preferences.skipFields.toLowerCase().trim().split(/\s*,\s*/).filter(function(s) { return s })
     if (!this.preferences.rawLaTag) this.preferences.rawLaTag = '#LaTeX'
-    Zotero.debug('prefs loaded: ' + JSON.stringify(this.preferences, null, 2))
+
+    const postscript_override = Zotero.getOption('preference_postscript')
+    if (typeof postscript_override === 'string') {
+      Zotero.debug(`{${this.header.label}} postscript override: ${postscript_override}`)
+      this.preferences.postscript = postscript_override
+    }
+    Zotero.debug(`{${this.header.label}} prefs loaded: ${JSON.stringify(this.preferences, null, 2)}`)
 
     if (stage == 'doExport') {
       this.caching = !(
@@ -74,7 +82,7 @@ var Translator = {
         || ((this.preferences.postscript || '').indexOf('Translator.options.exportPath') >= 0)
 
         // I can't see when a postscript override has changed, and it would introduce variability into the export
-        || Zotero.getOption('preference_postscript')
+        || postscript_override
       )
     }
 
@@ -105,7 +113,7 @@ var Translator = {
       for (const collection of Object.values(this.collections)) {
         if (collection.parent && !this.collections[collection.parent]) {
           collection.parent = false
-          Zotero.debug('BBT translator: collection with key ' + collection.key + ' has non-existent parent ' + collection.parent + ', assuming root collection')
+          Zotero.debug(`{${this.header.label}} collection with key ${collection.key} has non-existent parent ${collection.parent}, assuming root collection`)
         }
       }
     }
@@ -118,7 +126,7 @@ function doExport() {
   Translator.configure('doExport')
   Translator.initialize()
   Translator.doExport()
-  Zotero.debug(<%- JSON.stringify(header.label) %> + ' export took ' + (Date.now() - start))
+  Zotero.debug(`{${Translator.header.label}} export took ${Date.now() - start}ms`)
 }
 <% } %>
 

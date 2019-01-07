@@ -313,11 +313,14 @@ $patch$(Zotero.Translate.Export.prototype, 'translate', original => function() {
       }
 
       const postscriptOverrideFilename = Prefs.get('postscriptOverride')
+      log.debug('postscript override: file=', postscriptOverrideFilename)
       if (postscriptOverrideFilename) {
         const postscriptOverride = Zotero.File.pathToFile(this._displayOptions.exportPath)
         postscriptOverride.append(postscriptOverrideFilename)
+        log.debug('postscript override:', postscriptOverride.path, postscriptOverride.exists())
         if (postscriptOverride.exists()) {
           this._displayOptions.preference_postscript = Zotero.File.getContents(postscriptOverride)
+          log.debug('postscript override:', this._displayOptions.preference_postscript)
         }
       }
     }
@@ -361,6 +364,7 @@ $patch$(Zotero.Translate.Export.prototype, 'translate', original => function() {
       })
     }
 
+    log.debug('patched translate: _displayOptions=', this._displayOptions)
   } catch (err) {
     log.error('Zotero.Translate.Export::translate error:', err)
   }
