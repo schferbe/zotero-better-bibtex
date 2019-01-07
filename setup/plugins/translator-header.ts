@@ -36,7 +36,7 @@ class TranslatorHeaderPlugin {
         postscript: true,
       }
       for (const pref of Object.keys(prefs.defaults)) {
-        overrides[pref] = prefs.overrides.includes(pref)
+        overrides[pref] = overrides[pref] || prefs.overrides.includes(pref)
       }
 
       const headerCode = ejs.render(

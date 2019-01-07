@@ -20,6 +20,8 @@ var Translator = {
     this.debugEnabled = Zotero.BetterBibTeX.debugEnabled();
     this.unicode = true; // set by Better BibTeX later
 
+    let postscript_override = false
+
     if (stage == 'detectImport') {
       this.options = {}
     } else {
@@ -50,6 +52,10 @@ var Translator = {
       if (override) {
         try {
           value = Zotero.getOption(`preference_${pref}`)
+          if (pref === 'postscript' && typeof value === 'string') {
+            Zotero.debug(`{${this.header.label}} postscript override: ${value}`)
+            postscript_override = true
+          }
         } catch (err) {
           value = undefined
         }
@@ -63,11 +69,6 @@ var Translator = {
     this.preferences.skipFields = this.preferences.skipFields.toLowerCase().trim().split(/\s*,\s*/).filter(function(s) { return s })
     if (!this.preferences.rawLaTag) this.preferences.rawLaTag = '#LaTeX'
 
-    const postscript_override = Zotero.getOption('preference_postscript')
-    if (typeof postscript_override === 'string') {
-      Zotero.debug(`{${this.header.label}} postscript override: ${postscript_override}`)
-      this.preferences.postscript = postscript_override
-    }
     Zotero.debug(`{${this.header.label}} prefs loaded: ${JSON.stringify(this.preferences, null, 2)}`)
 
     if (stage == 'doExport') {
