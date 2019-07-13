@@ -12,14 +12,16 @@ const METHOD_NOT_FOUND = -32601 // The method does not exist / is not available.
 const INVALID_PARAMETERS = -32602 // Invalid method parameter(s).
 const INTERNAL_ERROR = -32603 // Internal JSON-RPC error.
 
-const $user = new class User {
+class User {
   public async groups() {
     return Zotero.Libraries.getAll().map(lib => ({ id: lib.libraryID, name: lib.name }))
   }
 }
 
-const $item = new class Item {
+class Item {
   public async search(terms) {
+    if (typeof terms !== 'string') terms = terms.terms
+
     // quicksearch-titleCreatorYear / quicksearch-fields
     // const mode = Prefs.get('caywAPIsearchMode')
 
@@ -42,9 +44,11 @@ const $item = new class Item {
     if (Zotero.QuickCopy.unserializeSetting(format).mode !== 'bibliography') throw new Error('formatted-citations requires the Zotero default quick-copy format to be set to a citation style')
     */
 
-    // add citekey search
-    for (const item of KeyManager.keys.find({ citekey: { $contains: terms } })) {
-      ids.add(item.itemID)
+    // add partial-citekey search results.
+    for (const partialCitekey of terms.split(/\s+/)) {
+      for (const item of KeyManager.keys.find({ citekey: { $contains: partialCitekey } })) {
+        ids.add(item.itemID)
+      }
     }
 
     const items = await getItemsAsync(Array.from(ids))
@@ -63,31 +67,23 @@ const $item = new class Item {
 }
 
 const api = new class API {
-  public async handle(request, allowArray = true) {
-    if (allowArray && Array.isArray(request)) {
-      const response = []
-      for (const subreq of request) {
-        response.push(await this.handle(subreq, false))
-      }
-      return response
-    }
+  public $user: User
+  public $item: Item
 
+  constructor() {
+    this.$item = new Item
+    this.$user = new User
+  }
+
+  public async handle(request) {
     if (!this.validRequest(request)) return {jsonrpc: '2.0', error: {code: INVALID_REQUEST, message: 'Invalid Request'}, id: null}
     if (request.params && (!Array.isArray(request.params) && typeof request.params !== 'object')) return {jsonrpc: '2.0', error: {code: INVALID_PARAMETERS, message: 'Invalid Parameters'}, id: null}
 
-    const [namespace, methodName ] = request.method.split('.')
-    let method = null
-
-    switch (namespace) {
-      case 'user':
-        method = $user[methodName]
-        break
-      case 'item':
-        method = $item[methodName]
-        break
-    }
+    const [ namespace, methodName ] = request.method.split('.')
+    const method = namespace && methodName && this[`$${namespace}`] && this[`$${namespace}`][methodName]
 
     if (!method) return {jsonrpc: '2.0', error: {code: METHOD_NOT_FOUND, message: `Method not found: ${request.method}`}, id: null}
+
     try {
       if (!request.params) return {jsonrpc: '2.0', result: await method(), id: request.id || null}
       if (Array.isArray(request.params)) return {jsonrpc: '2.0', result: await method.apply(null, request.params), id: request.id || null}
@@ -114,13 +110,15 @@ Zotero.Server.Endpoints['/better-bibtex/json-rpc'] = class {
   public async init(options) {
     await Zotero.BetterBibTeX.ready
 
-    if (typeof options.data === 'string') options.data = JSON.parse(options.data)
-    log.debug('json-rpc: execute', options.data)
-
+    let request = options.data
     try {
-      return [OK, 'application/json', JSON.stringify(await api.handle(options.data))]
+      if (typeof request === 'string') request = JSON.parse(request)
+      log.debug('json-rpc: execute', request)
+
+      const response = await (Array.isArray(request) ? Promise.all(request.map(req => api.handle(req))) : api.handle(request))
+      return [OK, 'application/json', JSON.stringify(response)]
     } catch (err) {
-      return [OK, 'application/json', JSON.stringify({jsonrpc: '2.0', error: {code: PARSE_ERROR, message: `Parse error: ${err} in ${options.data}`}, id: null})]
+      return [OK, 'application/json', JSON.stringify({jsonrpc: '2.0', error: {code: PARSE_ERROR, message: `Parse error: ${err} in ${request}`}, id: null})]
     }
   }
 }

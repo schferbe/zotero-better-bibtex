@@ -71,7 +71,7 @@ In `BetterBibLaTeX` and `BetterBibTeX`,
 
 - `reference.add` is the function to add or modify keys in `reference.has`. 
 
-  e.g. change the value of year in output `reference.add({name: 'year', replace: true, value: your_year_value})`
+  e.g. change the value of year in output `reference.add({name: 'year', value: your_year_value})`
 
 In `BetterCSLJSON` and `BetterCSLYAML`:
 
@@ -84,7 +84,7 @@ In `BetterCSLJSON` and `BetterCSLYAML`:
 
 Since BibTeX doesn't really have well-defined behavior across styles the way BibLaTeX does, BBT can't generate URL data which is compatible with all BibTeX styles. If you know the style you use yourself, you can add the data in the format you want using a postscript. The script below will add a note for the last accessed date, and a `\url` tag within the `howpublished` field, but only for BibTeX, not for BibLaTeX, and only for `webpage` entries:
 
-```js
+```
 if (Translator.BetterBibTeX && item.itemType === 'webpage') {
     if (item.accessDate) {
       reference.add({ name: 'note', value: "(accessed " + item.accessDate + ")" });
@@ -99,9 +99,9 @@ if (Translator.BetterBibTeX && item.itemType === 'webpage') {
 
 If you want to retain commas in your keywords (e.g. for chemical elements) and separate with a comma-space, you could do:
 
-```js
-if (Translator.BetterBibTeX || Translator.BetterBibLaTeX) {
-  reference.add({ name: 'keywords', replace: true, value: item.tags, sep: ', ' });
+```
+if (Translator.BetterTeX) {
+  reference.add({ name: 'keywords', value: item.tags, sep: ', ' });
 }
 ```
 
@@ -109,8 +109,8 @@ as the default encoder knows what to do with arrays, if you give it a separator.
 
 ### Add DOI in note field
 
-```js
-if ((Translator.BetterBibTeX || Translator.BetterBibLaTeX) && item.DOI) {
+```
+if (Translator.BetterTeX && item.DOI) {
   var doi = item.DOI;
   if (doi.indexOf('doi:') != 0) { doi = 'doi:' + doi; }
   reference.add({ name: 'note', duplicate: true, value: '[' + doi + ']' });
@@ -124,7 +124,7 @@ arXiv is a bit of an odd duck. It really isn't a journal, so it shouldn't be the
 But for arguments' sake, let's say you get the desired output by including an empty `journaltitle` field (ugh) and stuff the `arXiv:...` ID in the `pages` field (*ugh*). You could do that with the following postscript:
 
 ```
-if ((Translator.BetterBibTeX || Translator.BetterBibLaTeX) && item.arXiv.id) {
+if (Translator.BetterTeX && item.arXiv.id) {
   reference.add({ name: 'pages', value: item.arXiv.id });
   if (!reference.has.journaltitle) { reference.add({ name: 'journaltitle', bibtex: '{}' }); }
 }
@@ -134,7 +134,7 @@ if ((Translator.BetterBibTeX || Translator.BetterBibLaTeX) && item.arXiv.id) {
 
 Specify the ordering of the listing of fields in an exported Biblatex/Bibtex entry. Your postscript:
 
-```javascript
+```
 if (Translator.BetterTeX) {
   // the bib(la)tex fields are ordered according to this array.
   // If a field is not in this list, it will show up at the end in random order.
@@ -173,8 +173,8 @@ Further details [Export to Biblatex/Bibtex. Custom field order. #512](https://gi
 ### Detect and protect LaTeX math formulas
 
 ```
-if (Translator.BetterBibTeX && reference.has.title) {
-  reference.add({ name: 'title', value: item.title.replace(/(\$.*?\$)/g, '<script>$1</script>'), replace: true });
+if (Translator.BetterTeX && reference.has.title) {
+  reference.add({ name: 'title', value: item.title.replace(/(\$.*?\$)/g, '<script>{$1}</script>') });
 }
 ```
 
@@ -187,9 +187,9 @@ if (Translator.BetterBibLaTeX) {
   switch (item.itemType) {
     case 'videoRecording':
     case 'film':
-      item.creators.forEach(creator => {
+      for (const creator of item.creators) {
         if (creator.creatorType === 'director') creator.creatorType = 'author'
-      })
+      }
       reference.addCreators();
       break;
   }

@@ -239,14 +239,14 @@ const htmlConverter = new class HTMLConverter {
 
     // const chars = Zotero.Utilities.XRegExp.split(text.normalize('NFC'), '')
     const chars: string[] = Array.from(text.normalize('NFC'))
-    let ch, mapped, switched, m
+    let mapped, switched, m
     while (chars.length) {
-      if (chars.length > 1 && (mapped = this.mapping[ch = (chars[0] + chars[1])])) {
+      if (chars.length > 1 && (mapped = this.mapping[chars[0] + chars[1]])) {
         chars.splice(0, 2)
 
       } else {
         mapped = this.mapping[chars[0]] || { text: chars[0] }
-        ch = chars.shift()
+        chars.shift()
 
       }
 
@@ -260,16 +260,16 @@ const htmlConverter = new class HTMLConverter {
       }
 
       // balance out braces with invisible braces until http://tex.stackexchange.com/questions/230750/open-brace-in-bibtex-fields/230754#comment545453_230754 is widely deployed
-      switch (ch) {
-        case '{': braced += 1; break
-        case '}': braced -= 1; break
+      switch (mapped[mode]) {
+        case '\\{': braced += 1; break
+        case '\\}': braced -= 1; break
       }
       if (braced < 0) {
         latex += '\\vphantom\\{'
         braced = 0
       }
 
-      // if we just switched out of math mode, and there's a lone sup/sub at the end, unpack it
+      // if we just switched out of math mode, and there's a lone sup/sub at the end, unpack it. The extra option brace is for when we're in nocased mode (see switchTo)
       if (switched && mode === 'text' && (m = latex.match(/([\^_])\{(.)\}(\$\}?)$/))) {
         latex = latex.slice(0, latex.length - m[0].length) + m[1] + m[2] + m[3] // tslint:disable-line no-magic-numbers
       }
