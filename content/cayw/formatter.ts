@@ -263,7 +263,39 @@ export let Formatter = new class { // tslint:disable-line:variable-name
     return await Translators.exportItems(translator, exportOptions, items)
   }
 
+  public async devonthink(citations, options) {
+    const items = await getItemsAsync(citations.map(citation => citation.id))
+
+    return JSON.stringify(items.map(item => {
+      let publication = item.getField('publicationTitle') || item.getField('publisher') || ''
+      if (publication) {
+        const pub_details = []
+
+        const vol = item.getField('volume'),
+        if (vol) pub_details.push(`vol. ${vol}`)
+
+        const issue = item.getField('issue')
+        if (issue) pub_details.push(`issue ${issue}`)
+
+        if (pub_details.length) publication += '; ' + pub_details.join(' ')
+
+        const date = item.getField('date')
+        if (date) publication += `; ${date}`
+      }
+
+      return {
+        link: item.getField('url'),
+        name: item.getField('title'),
+        abstract: item.getField('abstract'),
+        authors: item.getCreators().map(creator => [ creator.name, creator.firstName, creator.lastName ].filter(n => n).join(' ')).join(', '),
+        publication,
+        type: Zotero.ItemTypes.getName(item.itemTypeID),
+      }
+    ))
+  }
+
   public async json(citations, options) {
-    return JSON.stringify(citations)
+    const items = (await getItemsAsync(citations.map(citation => citation.id))).reduce((acc, item) => { acc[item.id] = Zotero.Utilities.Internal.itemToExportFormat(item, false, true); return acc}, {})
+    return JSON.stringify(citations.map(cit => ({ ...cit, item: items[cit.id] })))
   }
 }
