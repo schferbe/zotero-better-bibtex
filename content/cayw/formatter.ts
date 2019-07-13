@@ -271,7 +271,7 @@ export let Formatter = new class { // tslint:disable-line:variable-name
       if (publication) {
         const pub_details = []
 
-        const vol = item.getField('volume'),
+        const vol = item.getField('volume')
         if (vol) pub_details.push(`vol. ${vol}`)
 
         const issue = item.getField('issue')
@@ -291,7 +291,7 @@ export let Formatter = new class { // tslint:disable-line:variable-name
         publication,
         type: Zotero.ItemTypes.getName(item.itemTypeID),
       }
-    ))
+    }))
   }
 
   public async json(citations, options) {
