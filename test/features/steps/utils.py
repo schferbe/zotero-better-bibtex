@@ -10,6 +10,7 @@ import sys
 import time
 import urllib.request
 import threading
+import psutil
 
 import pathlib
 for d in pathlib.Path(__file__).resolve().parents:
@@ -22,20 +23,36 @@ def print(txt, end='\n'):
   sys.stdout.flush()
 
 class benchmark(object):
-  def __init__(self,name):
+  def __init__(self, name, minimum = 0, interval = 1):
+    self.minimum = minimum
+    self.interval = interval
     self.name = name
+    self.cpu_percent = []
+    psutil.cpu_percent()
 
   def __enter__(self):
     self.started = time.time()
+    self.stop = threading.Event()
+    self.cpu_percent.append(psutil.cpu_percent())
+    threading.Timer(self.interval, self.measure, [time.time(), self.interval, self.stop]).start()
     return self
 
   def __exit__(self,ty,val,tb):
-    print("%s : %.2fs" % (self.name, self.elapsed))
+    if self.elapsed >= self.minimum: print('{} {:.2f}s ({:.2f}cpu)'.format(self.name, self.elapsed, self.cpu))
     return False
+
+  def measure(self, start, interval, stop):
+    if stop.is_set(): return
+    self.cpu_percent.append(psutil.cpu_percent())
+    threading.Timer(interval, self.measure, [start, interval, stop]).start()
 
   @property
   def elapsed(self):
     return time.time() - self.started
+
+  @property
+  def cpu(self):
+    return sum(self.cpu_percent) / len(self.cpu_percent)
 
 def assert_equal_diff(expected, found):
   assert expected == found, '\n' + '\n'.join(difflib.unified_diff(expected.split('\n'), found.split('\n'), fromfile='expected', tofile='found', lineterm=''))

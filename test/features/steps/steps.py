@@ -6,7 +6,7 @@ import json
 import time
 import os
 from hamcrest import assert_that, equal_to
-from steps.utils import assert_equal_diff, expand_scenario_variables
+from steps.utils import assert_equal_diff, expand_scenario_variables, benchmark
 import steps.utils as utils
 
 import pathlib
@@ -163,7 +163,8 @@ def step_impl(context, field, value):
 
 @when(u'I remove all items from "{collection}"')
 def step_impl(context, collection):
-  context.zotero.execute('await Zotero.BetterBibTeX.TestSupport.clearCollection(path)', path=collection)
+  with benchmark('clear collection'):
+    context.zotero.execute('await Zotero.BetterBibTeX.TestSupport.clearCollection(path)', path=collection)
 
 @when(u'I remove the selected item')
 def step_impl(context):
@@ -231,14 +232,15 @@ def step_impl(context, seconds):
 def step_impl(context, seconds):
   printed = False
   timeout = True
-  for n in range(seconds):
-    if not context.zotero.execute('return Zotero.BetterBibTeX.TestSupport.autoExportRunning()'):
-      timeout = False
-      break
-    time.sleep(1)
-    utils.print('.', end='')
-    printed = True
-  if printed: utils.print('')
+  with benchmark('wait for auto-export'):
+    for n in range(seconds):
+      if not context.zotero.execute('return Zotero.BetterBibTeX.TestSupport.autoExportRunning()'):
+        timeout = False
+        break
+      time.sleep(1)
+      utils.print('.', end='')
+      printed = True
+    if printed: utils.print('')
   assert (not timeout), 'Auto-export timed out'
 
 @step(u'I remove "{path}"')
