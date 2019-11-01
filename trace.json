@@ -1,5 +1,5 @@
 {
-  "-gh-1314": [
+  "gh-1313": [
     "content/**/*.ts",
     "!content/monkey-patch.ts",
     "!content/flash.ts",
